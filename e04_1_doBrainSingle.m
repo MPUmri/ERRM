@@ -283,7 +283,7 @@ pOfCorrVe = [p1 p2 p3]
 %     polyfit(estVeT(curM1&curM2a),pkE(curM1&curM2a,2),1)...
 %     polyfit(estVeT(curM1&curM2a),pkCE(curM1&curM2a,2),1)]
 
-% %%% vp
+%% %%% vp
 mX = 0.1;
 mY = 2;
 x = 0:mX:mX;
@@ -294,6 +294,9 @@ curM2c = pkCE(:,4)<mY & pkCE(:,4) > 0;
 
 m2=pkT(curM1&curM2b,3)\pkE(curM1&curM2b,4);
 m3=pkT(curM1&curM2c,3)\pkCE(curM1&curM2c,4);
+
+[c2,p2] = getCorrCoef(pkT(curM1&curM2b,3),pkE(curM1&curM2b,4));
+[c3,p3] = getCorrCoef(pkT(curM1&curM2c,3),pkCE(curM1&curM2c,4));
 
 figure
 scatter(pkT(curM1&curM2b,3),pkE(curM1&curM2b,4),sz,listColours{2})
@@ -313,6 +316,9 @@ title('Scatter - vp - CERRM vs ETM')
 xlabel('vp - ETM')
 ylabel('vp - CERRM')
 
+slopesVp = [m2 m3]
+corrVp = [c2 c3]
+pOfCorrVp = [p2 p3]
 %%
 mySlices = 7:9;
 
