@@ -7,6 +7,8 @@ The fitting functions for the two models is in `./mfiles/ERRM.m` and `./mfiles/C
 
 ## Code
 
+**Note:** This code is for an older revision. Will be updated soon.
+
 This section contains the code used in the study and is organized by the order of figures. 
 The code, results, and interactive figure (if available) for each figure is listed.
 
