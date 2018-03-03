@@ -1,18 +1,23 @@
 function [pkParams, resid, fitData] = LLSQ(Ct, theAif, t, modType, doNonNeg)
-  % Linear Fit, based on Murase (2004)
-  % Basic form: M*x = ctData
-  % where x is the pkParameters, and M is a matrix we'll build
-
+  % Linear Fit, based on Murase (2004) MRM, 51(4), 858–862. http://doi.org/10.1002/mrm.20022
   % Inputs:
-  % ctData is 2D concentration data 2D(t,x)
-  % theAif is the arterial input function (vector)
-  % t is the frame times
-  % It is assumed that length(t) = length(theAif) = length of ctData's 1st dimension
-  % modType = 0 for Tofts Model, = 1 for Extended Tofts Model
+  % Ct [MxN] - Concentration in tissue of interest for N voxels
+  % theAif [Mx1] - Concentration in blood plasma
+  % t [Mx1] - Time (in minutes) at each timepoint
+  % modType [bool] - Tofts Model (false or 0), Extended Tofts Model(true or 1)
+  % doNonNeg [bool] - do non-negative least squares
   % Outputs:
   % pkParams = [kTrans, kep] for Tofts model
   %            [kTrans, kep, vp] for Extended Tofts Model
   % resid = residual of the fit
+  % fitData = fitted curves
+  
+  %% Things to change
+  % - The name of the function should be changed from 'LLSQ' to something
+  % more appropriate (e.g. 'LinearTofts').
+  % - 'theAif' should be renamed to 'Cp'
+  % - Code is poorly commented
+  %%
   
   if nargin<5
       doNonNeg = false;

@@ -1,4 +1,5 @@
 function ct = TrapzKety(theAif, pkParams, t, doExt)
+    % Alternative to ToftsKety()
 
 	if nargin < 4
 		doExt = 0;

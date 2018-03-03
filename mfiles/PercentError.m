@@ -1,4 +1,5 @@
 function [percentErr, meanPercentErr, stdPercentErr, numBadEstimates] = PercentError(estVals, trueVals)
+    % Calculates percent error between two sets of values
 
     if isrow(trueVals)
         trueVals = trueVals';

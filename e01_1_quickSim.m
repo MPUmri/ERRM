@@ -1,8 +1,10 @@
-% Quick simulation
+% [OBSOLETE] Quick simulation
 % Simulates a noiseless curve for tissue of interest and reference region
 % Plasma volume component is included in tissue of interest
 % with vp = 0.001 to 0.1
 % Simulated data is fitted with reference region models
+
+% Only some of the results are shown at the end.
 
 % Estimated runtime: <10 seconds
 
@@ -19,8 +21,9 @@ tic
 
 %% Settings
 
-% Sigma for noise level in tissue of interest and reference region
-% Manuscript figure uses sigmaCt=0, sigmaCrr=0
+% Sigma (stdDev) for noise level in tissue of interest and reference region
+% This script works well if sigmaCt=0, sigmaCrr=0
+% otherwise, the y-axis limits will have to be modified
 sigmaCt = 0.0;
 sigmaCrr = 0.1*sigmaCt;
 
@@ -38,12 +41,13 @@ veRR = ktRR/kepRR;
 vpRange = 0:0.001:0.1;
 
 % Properties of the simulation
-sSize= 1; % Temporal resolution for generating simulated curves (in seconds)
+sSize= 0.1; % Temporal resolution for generating simulated curves (in seconds)
 tRes = 1; % Desired temporal resolution (in seconds), obtained by downsampling simulated data
-t=sSize:sSize:600; % Time, in seconds
-t=t'/60; % Convert time into minutes
+t= sSize:sSize:600; % Time, in seconds
+t= t'/60; % Convert time from seconds to minutes
 
-% Generate the arterial input function using literature-based model, injection at 60s
+% Generate the arterial input function using literature-based model
+% Bolus arrival at 60 seconds
 Cp = ParkerAif(t,t(60/sSize));
 
 %% Simulate concentration in Tissue of Interest
@@ -77,6 +81,8 @@ pkERRM = ERRM(Ct,Crr,t); % ERRM
 pkERRMn = ERRM(Ct,Crr,t,true); % ERRM - using lsqnonneg
 pkCERRM = CERRM(Ct,Crr,t); % CERRM
 pkCERRMn = CERRM(Ct,Crr,t,[],true); % CERRM using lsqnonneg
+
+% RTM = Reference Tissue Method - Not detailed in revised manuscript
 pkRTM = doRTM(Ct,Crr,t,[ktRR veRR],0); % RTM with Tofts Model
 pkERTM = doRTM(Ct,Crr,t,[ktRR veRR],1); % RTM with extended Tofts Model
 
@@ -116,19 +122,19 @@ errKepERTM = PercentError(pkERTM(:,2),kep);
 errVpERTM = PercentError(pkERTM(:,3),vpRange);
 
 %% Plot results
-% (Manuscript uses dashed line for ERRM. Here, CERRM uses dashed lines)
 
 % Specify the line colours
 lineColours{1} = [255,44,127]./255; % RRM - pink/red
 lineColours{2} = [255,196,68]./255; % ERRM - orange/gold
 lineColours{3} = [126,47,142]./255; % CERRM - purple
 
+% Define the line styles
 lineStyles{1} = '-'; % RRM - solid
 lineStyles{2} = '-'; % ERRM - solid
 lineStyles{3} = '--'; % CERRM - dashed
 
 % x-axis is plasma volume
-x=vpRange;
+x = vpRange;
 
 % Plot everything as subplots in one figure
 figure('Position',[300 300 700 700])
