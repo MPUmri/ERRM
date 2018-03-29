@@ -19,7 +19,7 @@ function [pkParams, fittedCt] = ERRM(Ct, Crr, t, doNonNeg, doPure, doReal)
   % - Get rid of 'doNonNeg' since NNLS does not provide improvement
   % - Get rid of 'doPure' and return original fitted params as additional output
   % - Instead of 'doReal' being boolean, make it a switch where one option
-  % allows complex fits to be discarded
+  % allows complex fits to be discarded or returned as NaN
   
   %% Set optional parameters to default values if they are not supplied
 

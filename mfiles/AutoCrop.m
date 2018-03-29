@@ -1,6 +1,4 @@
 function [ croppedImage ] = AutoCrop( image, mask )
-    % Crops 'image' using 'mask'
-    % Any empty rows and column are removed
 
     if nargin<2
         mask = image;
@@ -16,6 +14,9 @@ function [ croppedImage ] = AutoCrop( image, mask )
     elseif length(size(image))==3
         image(~any(mask,2),:,:) = [];
         image(:,~any(mask,1),:) = [];
+    elseif length(size(image))==4
+        image(~any(mask,2),:,:,:) = [];
+        image(:,~any(mask,1),:,:) = [];
     else
         disp('Not supported');
         image=0;

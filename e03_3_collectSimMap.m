@@ -20,14 +20,17 @@ outDirNN = './data/mapDownsample-NN';
 tic
 
 load('./data/simMap.mat');
-TRes = 1:60;
-listSigmaC = [0:0.01:0.05];
 
+% The settings below show be consistent with e03_2_analyzeSimMap.m
+TRes = 1:60; % Range of temporal resolutions that were simulated
+listSigmaC = 0:0.01:0.05;  % Range of noise levels
+
+% Reference region parameters
 ktRR = 0.07;
 kepRR = 0.5;
 veRR = ktRR/kepRR;
 
-repF = 100;
+repF = 100; % Number of replications for each noise level
 trueKt = repmat(trueKt(:),[repF 1]);
 trueKep = repmat(trueKep(:),[repF 1]);
 trueVe = repmat(trueVe(:),[repF 1]);
@@ -54,14 +57,21 @@ for i=1:length(TRes)
     
     % Record number of imaginary estimates from ERRM
     numImagE(i,j) = sum( sum(abs(imag(pkERRM')))>0 );
-    % Use only real part when calculating percent error
+    
+    % Use only real part when calculating percent error for ERRM
     pkERRM = real(pkERRM);
-    % For ERRM: exclude fits where tissue of interest and reference tissue
-    % have same kep values, as the ERRM fails to fit those cases
+    
+    % OPTIONAL
+    % For ERRM: we could exclude fits where tissue of interest and 
+    % reference tissue have same kep values, as the ERRM fails to fit those cases
     goodERRM = (trueKep~=kepRR);
+    % However, we will not remove those fits, so that the same number of
+    % fits are used for all models
+    % (It doesn't really change the results anyways)
+    goodERRM(:) = true; % Comment this line to ignore voxels where kep=kepRR
     
     %% Apply vpCutOff
-    % Does nothing if vpCutoff = [-inf inf]
+    % Does nothing if vpCutoff = [-inf inf]  (Default setting)
     pkCERRM(~vpMask,:)=[];
     pkCLRRM(~vpMask,:)=[];
     pkERRM(~vpMask,:)=[];
@@ -70,9 +80,9 @@ for i=1:length(TRes)
     pkLRRM(~vpMask,:)=[];
     pkRTM(~vpMask,:)=[];
     pkTM(~vpMask,:)=[];
-    %% Collect mean, std, and quartiles of the percent errors
+    %% Collect mean, stdDev, and quantiles of the percent errors
     
-    % TM
+    % Tofts Model - TM
     [ktError, meanKtErrT(i,j), stdKtErrT(i,j)] = PercentError(pkTM(:,1),trueKt(:));
     [veError, meanVeErrT(i,j), stdVeErrT(i,j)] = PercentError(pkTM(:,1)./pkTM(:,2),trueVe(:));
     [kepError, meanKepErrT(i,j), stdKepErrT(i,j)] = PercentError(pkTM(:,2),trueKep(:));
@@ -81,7 +91,7 @@ for i=1:length(TRes)
     qVeT(i,j,:) = quantile(veError,[.05 .25 .5 .75 .95]);
     qKepT(i,j,:) = quantile(kepError,[.05 .25 .5 .75 .95]);
     
-    % ETM
+    % Extended Tofts Model - ETM
     [ktError, meanKtErrET(i,j), stdKtErrET(i,j)] = PercentError(pkETM(:,1),trueKt(:));
     [veError, meanVeErrET(i,j), stdVeErrET(i,j)] = PercentError(pkETM(:,1)./pkETM(:,2),trueVe(:));
     [kepError, meanKepErrET(i,j), stdKepErrET(i,j)] = PercentError(pkETM(:,2),trueKep(:));
@@ -92,7 +102,7 @@ for i=1:length(TRes)
     qKepET(i,j,:) = quantile(kepError,[.05 .25 .5 .75 .95]);
     qVpET(i,j,:) = quantile(vpError,[.05 .25 .5 .75 .95]);
     
-    % RTM-TM
+    % Reference Tissue Method - RTM (not mentioned in manuscript)
     [ktError, meanKtErrRT(i,j), stdKtErrRT(i,j)] = PercentError(pkRTM(:,1),trueKt(:));
     [veError, meanVeErrRT(i,j), stdVeErrRT(i,j)] = PercentError(pkRTM(:,1)./pkRTM(:,2),trueVe(:));
     [kepError, meanKepErrRT(i,j), stdKepErrRT(i,j)] = PercentError(pkRTM(:,2),trueKep(:));
@@ -101,7 +111,7 @@ for i=1:length(TRes)
     qVeRT(i,j,:) = quantile(veError,[.05 .25 .5 .75 .95]);
     qKepRT(i,j,:) = quantile(kepError,[.05 .25 .5 .75 .95]);
     
-    % ERTM (or RTM-ETM)
+    % Extended Reference Tissue Method - ERTM (not mentioned in manuscript)
     [ktError, meanKtErrERT(i,j), stdKtErrERT(i,j)] = PercentError(pkERTM(:,1),trueKt(:));
     [veError, meanVeErrERT(i,j), stdVeErrERT(i,j)] = PercentError(pkERTM(:,1)./pkERTM(:,2),trueVe(:));
     [kepError, meanKepErrERT(i,j), stdKepErrERT(i,j)] = PercentError(pkERTM(:,2),trueKep(:));
@@ -112,7 +122,7 @@ for i=1:length(TRes)
     qKepERT(i,j,:) = quantile(kepError,[.05 .25 .5 .75 .95]);
     qVpERT(i,j,:) = quantile(vpError,[.05 .25 .5 .75 .95]);
     
-    % CERRM
+    % Constrained Extended Reference Region Model - CERRM
     [ktError, meanKtErrCE(i,j), stdKtErrCE(i,j), badValKtCE(i,j)] = PercentError(ktRR*pkCERRM(:,1),trueKt(:));
     [veError, meanVeErrCE(i,j), stdVeErrCE(i,j), badValVeCE(i,j)] = PercentError(veRR*pkCERRM(:,2),trueVe(:));
     [kepError, meanKepErrCE(i,j), stdKepErrCE(i,j), badValKepCE(i,j)] = PercentError(pkCERRM(:,3),trueKep(:));
@@ -123,7 +133,7 @@ for i=1:length(TRes)
     qKepCE(i,j,:) = quantile(kepError,[.05 .25 .5 .75 .95]);
     qVpCE(i,j,:) = quantile(vpError,[.05 .25 .5 .75 .95]);
     
-    % ERRM
+    % Extended Reference Region Model - ERRM
     [ktError, meanKtErrE(i,j), stdKtErrE(i,j), badValKtE(i,j)] = PercentError(ktRR*pkERRM(:,1),trueKt(:));
     [veError, meanVeErrE(i,j), stdVeErrE(i,j), badValVeE(i,j)] = PercentError(veRR*pkERRM(:,2),trueVe(:));
     [kepError, meanKepErrE(i,j), stdKepErrE(i,j), badValKepE(i,j)] = PercentError(pkERRM(:,3),trueKep(:));
@@ -134,7 +144,7 @@ for i=1:length(TRes)
     qKepE(i,j,:) = quantile(kepError(goodERRM),[.05 .25 .5 .75 .95]);
     qVpE(i,j,:) = quantile(vpError,[.05 .25 .5 .75 .95]);
     
-    % RRM
+    % Reference Region Model - RRM
     [ktError, meanKtErrR(i,j), stdKtErrR(i,j)] = PercentError(ktRR*pkLRRM(:,1),trueKt(:));
     [veError, meanVeErrR(i,j), stdVeErrR(i,j)] = PercentError(veRR*pkLRRM(:,2),trueVe(:));
     [kepError, meanKepErrR(i,j), stdKepErrR(i,j)] = PercentError(pkLRRM(:,3),trueKep(:));
@@ -143,7 +153,7 @@ for i=1:length(TRes)
     qVeR(i,j,:) = quantile(veError,[.05 .25 .5 .75 .95]);
     qKepR(i,j,:) = quantile(kepError,[.05 .25 .5 .75 .95]);
     
-    % CLRRM - not mentioned in manuscript
+    % Non-extended Contrained Reference Region Model - CRRM (not mentioned in manuscript)
     [ktError, meanKtErrCR(i,j), stdKtErrCR(i,j)] = PercentError(ktRR*pkCLRRM(:,1),trueKt(:));
     [veError, meanVeErrCR(i,j), stdVeErrCR(i,j)] = PercentError(veRR*pkCLRRM(:,2),trueVe(:));
     [kepError, meanKepErrCR(i,j), stdKepErrCR(i,j)] = PercentError(pkCLRRM(:,3),trueKep(:));
@@ -152,7 +162,9 @@ for i=1:length(TRes)
     qVeCR(i,j,:) = quantile(veError,[.05 .25 .5 .75 .95]);
     qKepCR(i,j,:) = quantile(kepError,[.05 .25 .5 .75 .95]);
     
-    %%
+    %% Load fits using NNLS - if the fits were performed
+    % This is pretty much a copy/paste job of the code above, with minor
+    % changes. Minimal comments ahead.
     if didNonNeg
         load(fullfile(outDirNN, 'CERRM', curFile));
         load(fullfile(outDirNN, 'ETM', curFile));
@@ -233,9 +245,10 @@ for i=1:length(TRes)
     end
 end
 end
+
 %% Export mean and std of percent errors as csv
-outFile = fullfile('./dataResults',['e03a-downsampleMapResultsMean.csv']);
-hdr=['FitMethod,TemporalRes,sigmaC,errKt,errVe,errKep,errVp,stdKt,stdVe,stdKep,stdVp'];
+outFile = fullfile('./dataResults','e03a-downsampleMapResultsMean.csv');
+hdr='FitMethod,TemporalRes,sigmaC,errKt,errVe,errKep,errVp,stdKt,stdVe,stdKep,stdVp';
 outID = fopen(outFile, 'w+');
 fprintf(outID, '%s\n', hdr); % Print header into csv file
 for j=1:length(listSigmaC)
@@ -272,6 +285,11 @@ for i=1:length(TRes)
        stdKtErrCR(i,j),stdVeErrCR(i,j),stdKepErrCR(i,j),NaN};
    fprintf(outID,'%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n', outLine{:});
    
+   % Export results from NNLS fits, if they were performed
+   if ~didNonNeg
+       continue
+   end
+   
    outLine = {'ETM-NN',TRes(i),listSigmaC(j),meanKtErrETnn(i,j),meanVeErrETnn(i,j),meanKepErrETnn(i,j),meanVpErrETnn(i,j),...
        stdKtErrETnn(i,j),stdVeErrETnn(i,j),stdKepErrETnn(i,j),stdVpErrETnn(i,j)};
    fprintf(outID,'%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n', outLine{:});
@@ -297,7 +315,8 @@ for i=1:length(TRes)
    fprintf(outID,'%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n', outLine{:});
 end
 end
-fclose(outID)
+fclose(outID);
+
 %% Export quartiles of percent error as csv
 outFile = fullfile('./dataResults',['e03b-downsampleMapResultsQuantiles.csv']);
 hdr=['FitMethod,TemporalRes,sigmaC,q5Kt,q25Kt,q50Kt,q75Kt,q95Kt,q5Ve,q25Ve,q50Ve,q75Ve,q95Ve,q5Kep,q25Kep,q50Kep,q75Kep,q95Kep,q5Vp,q25Vp,q50Vp,q75Vp,q95Vp'];
@@ -369,6 +388,11 @@ for i=1:length(TRes)
        };
    fprintf(outID,'%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n', outLine{:}); 
    
+   % Export results from NNLS fits, if they were performed
+   if ~didNonNeg
+       continue
+   end
+   
    outLine = {'ETM-NN',TRes(i),listSigmaC(j),...
        qKtETnn(i,j,1),qKtETnn(i,j,2),qKtETnn(i,j,3),qKtETnn(i,j,4),qKtETnn(i,j,5),...
        qVeETnn(i,j,1),qVeETnn(i,j,2),qVeETnn(i,j,3),qVeETnn(i,j,4),qVeETnn(i,j,5),...
@@ -418,7 +442,7 @@ for i=1:length(TRes)
    fprintf(outID,'%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n', outLine{:});
 end
 end
-fclose(outID)
+fclose(outID);
 toc
 
 %% Plots
@@ -426,120 +450,142 @@ toc
 %% Median +/- interquartile range vs StdDev of Noise
 
 myX = listSigmaC;
-myTres = 1;
+myTres = 5;
 lErr = 2;
 hErr = 4;
 
-figure('Position',[300 300 300 500])
-errorbar(myX,qKtERT(myTres,:,3),abs(qKtERT(myTres,:,lErr)-qKtERT(myTres,:,3)),abs(qKtERT(myTres,:,hErr)-qKtERT(myTres,:,3)))
+clrERRM = [247,151,86]./255;
+clrCERRM = [126,47,142]./255;
+
+figure('Position',[300 300 1200 500])
+
+subplot(1,4,1)
+errorbar(myX,qKtE(myTres,:,3),abs(qKtE(myTres,:,lErr)-qKtE(myTres,:,3)),abs(qKtE(myTres,:,hErr)-qKtE(myTres,:,3)),'linewidth',3,'linestyle','--','Color',clrERRM)
 hold on
-errorbar(myX,qKtCE(myTres,:,3),abs(qKtCE(myTres,:,lErr)-qKtCE(myTres,:,3)),abs(qKtCE(myTres,:,hErr)-qKtCE(myTres,:,3)))
-hold on
-errorbar(myX,qKtE(myTres,:,3),abs(qKtE(myTres,:,lErr)-qKtE(myTres,:,3)),abs(qKtE(myTres,:,hErr)-qKtE(myTres,:,3)))
+errorbar(myX,qKtCE(myTres,:,3),abs(qKtCE(myTres,:,lErr)-qKtCE(myTres,:,3)),abs(qKtCE(myTres,:,hErr)-qKtCE(myTres,:,3)),'linewidth',3,'Color',clrCERRM)
 hold off
-ylim([-20 20])
+ylim([-70 10])
 xlabel('StdDev [mM]')
 ylabel('Percent Error')
 title('Ktrans')
-legend('ERTM','CERRM','ERRM')
 
-figure('Position',[300 300 300 500])
-errorbar(myX,qKepERT(myTres,:,3),abs(qKepERT(myTres,:,lErr)-qKepERT(myTres,:,3)),abs(qKepERT(myTres,:,hErr)-qKepERT(myTres,:,3)))
+subplot(1,4,2)
+errorbar(myX,qKepE(myTres,:,3),abs(qKepE(myTres,:,lErr)-qKepE(myTres,:,3)),abs(qKepE(myTres,:,hErr)-qKepE(myTres,:,3)),'linewidth',3,'linestyle','--','Color',clrERRM)
 hold on
-errorbar(myX,qKepCE(myTres,:,3),abs(qKepCE(myTres,:,lErr)-qKepCE(myTres,:,3)),abs(qKepCE(myTres,:,hErr)-qKepCE(myTres,:,3)))
-hold on
-errorbar(myX,qKepE(myTres,:,3),abs(qKepE(myTres,:,lErr)-qKepE(myTres,:,3)),abs(qKepE(myTres,:,hErr)-qKepE(myTres,:,3)))
+errorbar(myX,qKepCE(myTres,:,3),abs(qKepCE(myTres,:,lErr)-qKepCE(myTres,:,3)),abs(qKepCE(myTres,:,hErr)-qKepCE(myTres,:,3)),'linewidth',3,'Color',clrCERRM)
 hold off
-ylim([-20 20])
+ylim([-50 20])
 xlabel('StdDev [mM]')
 ylabel('Percent Error')
 title('kep')
-legend('ERTM','CERRM','ERRM')
 
-figure('Position',[300 300 300 500])
-errorbar(myX,qVeERT(myTres,:,3),abs(qVeERT(myTres,:,lErr)-qVeERT(myTres,:,3)),abs(qVeERT(myTres,:,hErr)-qVeERT(myTres,:,3)))
+subplot(1,4,3)
+errorbar(myX,qVeE(myTres,:,3),abs(qVeE(myTres,:,lErr)-qVeE(myTres,:,3)),abs(qVeE(myTres,:,hErr)-qVeE(myTres,:,3)),'linewidth',3,'linestyle','--','Color',clrERRM)
 hold on
-errorbar(myX,qVeCE(myTres,:,3),abs(qVeCE(myTres,:,lErr)-qVeCE(myTres,:,3)),abs(qVeCE(myTres,:,hErr)-qVeCE(myTres,:,3)))
-hold on
-errorbar(myX,qVeE(myTres,:,3),abs(qVeE(myTres,:,lErr)-qVeE(myTres,:,3)),abs(qVeE(myTres,:,hErr)-qVeE(myTres,:,3)))
+errorbar(myX,qVeCE(myTres,:,3),abs(qVeCE(myTres,:,lErr)-qVeCE(myTres,:,3)),abs(qVeCE(myTres,:,hErr)-qVeCE(myTres,:,3)),'linewidth',3,'Color',clrCERRM)
 hold off
-ylim([-20 20])
+ylim([-50 20])
 xlabel('StdDev [mM]')
 ylabel('Percent Error')
 title('ve')
-legend('ERTM','CERRM','ERRM')
 
-figure('Position',[300 300 300 500])
-errorbar(myX,qVpERT(myTres,:,3),abs(qVpERT(myTres,:,lErr)-qVpERT(myTres,:,3)),abs(qVpERT(myTres,:,hErr)-qVpERT(myTres,:,3)))
+subplot(1,4,4)
+errorbar(myX,qVpE(myTres,:,3),abs(qVpE(myTres,:,lErr)-qVpE(myTres,:,3)),abs(qVpE(myTres,:,hErr)-qVpE(myTres,:,3)),'linewidth',3,'linestyle','--','Color',clrERRM)
 hold on
-errorbar(myX,qVpCE(myTres,:,3),abs(qVpCE(myTres,:,lErr)-qVpCE(myTres,:,3)),abs(qVpCE(myTres,:,hErr)-qVpCE(myTres,:,3)))
-hold on
-errorbar(myX,qVpE(myTres,:,3),abs(qVpE(myTres,:,lErr)-qVpE(myTres,:,3)),abs(qVpE(myTres,:,hErr)-qVpE(myTres,:,3)))
+errorbar(myX,qVpCE(myTres,:,3),abs(qVpCE(myTres,:,lErr)-qVpCE(myTres,:,3)),abs(qVpCE(myTres,:,hErr)-qVpCE(myTres,:,3)),'linewidth',3,'Color',clrCERRM)
 hold off
-ylim([-50 50])
+ylim([-40 160])
 xlabel('StdDev [mM]')
 ylabel('Percent Error')
 title('vp')
-legend('ERTM','CERRM','ERRM')
+legend('ERRM','CERRM')
 
 %% Ratios of interquartile range between ERRM and CERRM
-quartRatio_Kt=(qKtE(myTres,:,hErr)-qKtE(myTres,:,lErr))./(qKtCE(myTres,:,hErr)-qKtCE(myTres,:,lErr))
-quartRatio_Kep=(qKepE(myTres,:,hErr)-qKepE(myTres,:,lErr))./(qKepCE(myTres,:,hErr)-qKepCE(myTres,:,lErr))
-quartRatio_Ve=(qVeE(myTres,:,hErr)-qVeE(myTres,:,lErr))./(qVeCE(myTres,:,hErr)-qVeCE(myTres,:,lErr))
-quartRatio_Vp=(qVpE(myTres,:,hErr)-qVpE(myTres,:,lErr))./(qVpCE(myTres,:,hErr)-qVpCE(myTres,:,lErr))
+quartRatio_Kt=(qKtE(myTres,:,hErr)-qKtE(myTres,:,lErr))./(qKtCE(myTres,:,hErr)-qKtCE(myTres,:,lErr));
+quartRatio_Kep=(qKepE(myTres,:,hErr)-qKepE(myTres,:,lErr))./(qKepCE(myTres,:,hErr)-qKepCE(myTres,:,lErr));
+quartRatio_Ve=(qVeE(myTres,:,hErr)-qVeE(myTres,:,lErr))./(qVeCE(myTres,:,hErr)-qVeCE(myTres,:,lErr));
+quartRatio_Vp=(qVpE(myTres,:,hErr)-qVpE(myTres,:,lErr))./(qVpCE(myTres,:,hErr)-qVpCE(myTres,:,lErr));
+
+figure
+boxplot([quartRatio_Kt; quartRatio_Kep; quartRatio_Ve; quartRatio_Vp]', ...
+    'Labels',{'Ktrans','kep','ve','vp'})
+title('Ratio of Interquartile Range between ERRM and CERRM')
+ylim([0 4])
+
+% The above figure shows the ratio of the interquartile range, i.e. the error
+% bars in Figure 2, between the ERRM and CERRM. For example, a value of 2
+% means that the ERRM's error bars are twice as large as the CERRM.
+% The boxplot shows the spread of this ratio for the different noise
+% levels.
+
+% The manuscript undersells the improvement of the CERRM by saying that its
+% error bars were smaller by a factor of 1.5, 3, 1.5, and ~1 for Ktrans,
+% kep, ve, and vp, respectively. 
+% The figure shows a median improvement by a factor of 2, 3.2, 2, and ~1,
+% respectively.
 
 %% Median +/- interquartile range vs Temporal Resolution
 mySig = 2;
 lErr = 2;
 hErr = 4;
 
+xRange = 1:30;
+
 cCE = [.5 .2 .55];
 cET = [.3 .7 .6];
 
-figure('Position',[300 300 300 500])
+figure('Position',[300 300 1200 500])
+subplot(1,4,1)
 hold on
-shadedErrorPlot(TRes',qKtET(:,mySig,3),qKtET(:,mySig,lErr),qKtET(:,mySig,hErr),cET);
-shadedErrorPlot(TRes',qKtCE(:,mySig,3),qKtCE(:,mySig,lErr),qKtCE(:,mySig,hErr),cCE);
+shadedErrorPlot(TRes(xRange)',qKtET(xRange,mySig,3),qKtET(xRange,mySig,lErr),qKtET(xRange,mySig,hErr),cET);
+shadedErrorPlot(TRes(xRange)',qKtCE(xRange,mySig,3),qKtCE(xRange,mySig,lErr),qKtCE(xRange,mySig,hErr),cCE);
 hold off
-ylim([-100 100])
+ylim([-60 40])
 xlabel('Temporal Resolution [s]')
 ylabel('Percent Error')
 title('Ktrans')
+legend('','ETM','','CERRM')
 
-figure('Position',[300 300 300 500])
+subplot(1,4,2)
 hold on
-shadedErrorPlot(TRes',qKepET(:,mySig,3),qKepET(:,mySig,lErr),qKepET(:,mySig,hErr),cET);
-shadedErrorPlot(TRes',qKepCE(:,mySig,3),qKepCE(:,mySig,lErr),qKepCE(:,mySig,hErr),cCE);
+shadedErrorPlot(TRes(xRange)',qKepET(xRange,mySig,3),qKepET(xRange,mySig,lErr),qKepET(xRange,mySig,hErr),cET);
+shadedErrorPlot(TRes(xRange)',qKepCE(xRange,mySig,3),qKepCE(xRange,mySig,lErr),qKepCE(xRange,mySig,hErr),cCE);
 hold off
-ylim([-100 100])
+ylim([-60 40])
 xlabel('Temporal Resolution [s]')
 ylabel('Percent Error')
 title('kep')
 
-figure('Position',[300 300 300 500])
+subplot(1,4,3)
 hold on
-shadedErrorPlot(TRes',qVeET(:,mySig,3),qVeET(:,mySig,lErr),qVeET(:,mySig,hErr),cET);
-shadedErrorPlot(TRes',qVeCE(:,mySig,3),qVeCE(:,mySig,lErr),qVeCE(:,mySig,hErr),cCE);
+shadedErrorPlot(TRes(xRange)',qVeET(xRange,mySig,3),qVeET(xRange,mySig,lErr),qVeET(xRange,mySig,hErr),cET);
+shadedErrorPlot(TRes(xRange)',qVeCE(xRange,mySig,3),qVeCE(xRange,mySig,lErr),qVeCE(xRange,mySig,hErr),cCE);
 hold off
-ylim([-100 100])
+ylim([-60 40])
 xlabel('Temporal Resolution [s]')
 ylabel('Percent Error')
 title('ve')
 
-figure('Position',[300 300 300 500])
+subplot(1,4,4)
 hold on
-shadedErrorPlot(TRes',qVpET(:,mySig,3),qVpET(:,mySig,lErr),qVpET(:,mySig,hErr),cET);
-shadedErrorPlot(TRes',qVpCE(:,mySig,3),qVpCE(:,mySig,lErr),qVpCE(:,mySig,hErr),cCE);
+shadedErrorPlot(TRes(xRange)',qVpET(xRange,mySig,3),qVpET(xRange,mySig,lErr),qVpET(xRange,mySig,hErr),cET);
+shadedErrorPlot(TRes(xRange)',qVpCE(xRange,mySig,3),qVpCE(xRange,mySig,lErr),qVpCE(xRange,mySig,hErr),cCE);
 hold off
-ylim([-100 1000])
+ylim([-100 300])
 xlabel('Temporal Resolution [s]')
 ylabel('Percent Error')
 title('vp')
 
 %% Make the Error Maps
-indTRes = 1;
-indSigma = 1;
-repF = 100;
+% These steps should've been moved to a new script, but were appended here
+% The next steps load a specific dataset (noiseless, TemporalRes = 1s)
+% and makes the percent error maps for kep (Fig 1 in  manuscript)
+% and computes the error for RRM at vp=0.01 (mentioned in manuscript text)
+
+% Pick which dataset to load
+indTRes = 1; % Default (1) : Temporal resolutions = 1 s
+indSigma = 1; % Default (1) : Noiseless
+repF = 100; % Default (100) | Replications for each noise
 
 curFile = ['Downsample-Noise-' num2str(indSigma) '-TRes-' num2str(indTRes) '.mat'];
 load(fullfile(outDir, 'ETM', curFile));
@@ -548,6 +594,7 @@ load(fullfile(outDir, 'CERRM', curFile));
 % Apply vpCutOff - unnecessary
 pkCERRM(~vpMask,:)=[];
 pkERRM(~vpMask,:)=[];
+pkLRRM(~vpMask,:)=[];
 pkERTM(~vpMask,:)=[];
 pkETM(~vpMask,:)=[];
 pkRTM(~vpMask,:)=[];
@@ -574,13 +621,44 @@ kepErrorE = reshape(kepError,[nX nY repF]);
 veErrorE = reshape(veError,[nX nY repF]);
 vpErrorE = reshape(vpError,[nX nY repF]);
 
-%% Plot the error maps
-% Missing axes labels
-figure('Position',[300 300 300 500])
-showErrMap(flipud(mean(kepErrorCE,3)),0.1)
-title('CERRM-kep')
+ktError = PercentError(ktRR*pkLRRM(:,1),trueKt(:));
+veError = PercentError(veRR*pkLRRM(:,2),trueVe(:));
+kepError = PercentError(pkLRRM(:,3),trueKep(:));
 
-figure('Position',[300 300 300 500])
+ktErrorR = reshape(ktError,[nX nY repF]);
+kepErrorR = reshape(kepError,[nX nY repF]);
+veErrorR = reshape(veError,[nX nY repF]);
+
+% Missing axes labels
+figure('Position',[300 300 1200 500])
+
+subplot(1,3,1)
+showErrMap(logModulus(flipud(mean(kepErrorR,3))),3)
+title('RRM - kep Percent Error')
+
+subplot(1,3,2)
 showErrMap(flipud(mean(kepErrorE,3)),0.1)
-title('ERRM-kep')
-%%
+title('ERRM - kep Percent Error')
+
+subplot(1,3,3)
+showErrMap(flipud(mean(kepErrorCE,3)),0.1)
+title('CERRM - kep Percent Error')
+%% Show the median percent error and interquartile for RRM at chosen vp
+
+% Recompute errors from previous loaded data
+ktError = PercentError(ktRR*pkLRRM(:,1),trueKt(:));
+veError = PercentError(veRR*pkLRRM(:,2),trueVe(:));
+kepError = PercentError(pkLRRM(:,3),trueKep(:));
+
+chosenVp = 0.01;
+estsKt = ktError(trueVp(:)==chosenVp,:);
+estsKep = kepError(trueVp(:)==chosenVp,:);
+estsVe = veError(trueVp(:)==chosenVp,:);
+
+disp(['Median percent error and interquartile range for RRM when vp = ' num2str(chosenVp)])
+disp('For Ktrans:')
+disp([median(estsKt(:)) iqr(estsKt(:))])
+disp('For kep:')
+disp([median(estsKep(:)) iqr(estsKep(:))])
+disp('For ve:')
+disp([median(estsVe(:)) iqr(estsVe(:))])

@@ -1,24 +1,31 @@
 % Process the GBM data with RRM, ERRM, CERRM, and ETM
 
+% Note, there is additional code at the end for producing figures.
+% They are not produced by default because it leads to a flood of figures.
+% They can be produced manually (select cell and ctrl+enter on windows)
+% If you do want a flood of figures, then simply delete the 'return' line
+% (This will produce ~10 figures per run)
+
 % Estimated runtime: ~5 seconds
 
 %% Pre-setup
 clearvars
 addpath('./mfiles')
 
-%5 Load data
-load('./data/gbm/gbmData.mat');
+% Select which dataset to process
+i=1; % Options: 1, 2, 3 (called A, B, C, in manuscripts)
+%%
+matList = {'TCGA-06-0185-1.mat','TCGA-06-0185-2.mat','TCGA-06-0881-1.mat'};
+load(fullfile('./data/gbm',matList{i}));
 % The loaded data contains:
 % t   [70x1] - time (in minutes) at each dce frame
 % Cp  [70x1] - concentration in blood plasma
 % Crr [70x1] - concentration in reference region
-% Ct  [70x10813] - concentration in tumour voxels (10813 voxels)
+% Ct  [70xN] - concentration in N tumour voxels
 % mask[256x256x16] - mask of the tumour region (used to reconstruct maps)
-
 % Unnecessary items also included in loaded data:
 % sT - number of time points
 % sX,sY,sZ - dimensions of mask
-
 
 %% Calculate standard deviation of pre-contrast frames
 preContrastFrames = Ct(1:6,:);
@@ -29,24 +36,14 @@ stdDev_perContrastRR = std(Crr(1:6));
 %% Fit with ERRM and CERRM
 
 % CERRM() provides paramaters for both ERRM (pkE) and CERRM (pkCE)
-[pkCE, fitE, estKepRR_CE, pkE, fitE]=CERRM(Ct,Crr,t);
-
-% % ERRM
-% tic
-% pkE=ERRM(Ct,Crr,t);
-% toc
-% % CERRM
-% tic
-% [pkCE r estKepRR_CE]=CERRM(Ct,Crr,t);
-% toc
-
+[pkCE, ~, estKepRR_CE, pkE]=CERRM(Ct,Crr,t);
 
 %% Fit with non-extended RRM
 tic
 pkR=LRRM(Ct,Crr,t);
 toc
 
-%% Fit with ETM
+%% Fit with ExtToftsModel
 tic
 [pkT residT fitETM] = LLSQ(Ct,Cp,t,1);
 toc
@@ -60,9 +57,61 @@ kepRR = pkCrr(2);
 veRR = ktRR/kepRR;
 % Extended Tofts model fit
 pkCrr = LLSQ(Crr,Cp,t,1);
-vpRR = pkCrr(3)
+vpRR = pkCrr(3);
 
-%% Produce the maps
+%% Correlations
+
+% Only use voxels where max concentration is between 0.05 and 1 mM
+corrMask = max(Ct)'>0.05 & max(Ct)'<1;
+
+% Ktrans correlation corefficients
+cKtR=getCorrCoef(pkT(corrMask,1),pkR(corrMask,1));
+cKtE=getCorrCoef(pkT(corrMask,1),pkE(corrMask,1));
+cKtCE=getCorrCoef(pkT(corrMask,1),pkCE(corrMask,1));
+disp('Correlation with Ktrans')
+disp([cKtR cKtE cKtCE])
+
+% kep correlation coefficients
+cKepR=getCorrCoef(pkT(corrMask,2),pkR(corrMask,3));
+cKepE=getCorrCoef(pkT(corrMask,2),pkE(corrMask,3));
+cKepCE=getCorrCoef(pkT(corrMask,2),pkCE(corrMask,3));
+disp('Correlation with kep')
+disp([cKepR cKepE cKepCE])
+
+% ve correlation coefficients - requires extra bit of filtering
+% There are sometimes extreme values (outliers) in ve, and the correlation
+% cofficient is sensitive to these outliers. So, we only use data between
+% the 1-99 percentile as a way to filter out the outliers.
+qtRange = [.01 .99];
+estVe = pkT(:,1)./pkT(:,2);
+qtETM = quantile(estVe(corrMask),qtRange);
+qtR = quantile(pkR(corrMask,2),qtRange);
+qtE = quantile(pkE(corrMask,2),qtRange);
+qtCE = quantile(pkCE(corrMask,2),qtRange);
+veMask = (estVe > qtETM(1) & estVe < qtETM(2)) ... 
+    & (pkR(:,2) > qtR(1) & pkR(:,2) < qtR(2)) ...
+    & (pkE(:,2) > qtE(1) & pkE(:,2) < qtE(2)) ...
+    & (pkCE(:,2) > qtCE(1) & pkCE(:,2) < qtCE(2));
+veMask = veMask & corrMask;
+
+cVeR=getCorrCoef(estVe(veMask),pkR(veMask,2));
+cVeE=getCorrCoef(estVe(veMask),pkE(veMask,2));
+cVeCE=getCorrCoef(estVe(veMask),pkCE(veMask,2));
+
+disp('Correlation with ve')
+disp([cVeR cVeE cVeCE])
+
+% vp correlation coefficients
+cVpE=getCorrCoef(pkT(corrMask,3),pkE(corrMask,4));
+cVpCE=getCorrCoef(pkT(corrMask,3),pkCE(corrMask,4));
+disp('Correlation with vp')
+disp([NaN cVpE cVpCE])
+
+%% Make the maps
+% To display the maps, scroll down to find code for producing maps
+% Alternatively, use `showMe()` in the terminal, e.g:
+% > showMe(kepC) 
+% will show the kep maps produced by the CERRM
 ktT = zeros(size(mask));
 ktE = ktT;
 ktC = ktT;
@@ -105,10 +154,51 @@ ktR(mask(:))=pkR(:,1);
 veR(mask(:))=pkR(:,2);
 kepR(mask(:))=pkR(:,3);
 
-%% Correlations
+% Crop the maps
+kepR = AutoCrop(kepR);
+kepE = AutoCrop(kepE);
+kepC = AutoCrop(kepC);
+kepT = AutoCrop(kepT);
 
-% Calculate ve from Extended Tofts model (Ktrans/kep)
-estVeT = pkT(:,1)./pkT(:,2);
+ktR = AutoCrop(ktR);
+ktE = AutoCrop(ktE);
+ktC = AutoCrop(ktC);
+ktT = AutoCrop(ktT);
+
+veR = AutoCrop(veR);
+veE = AutoCrop(veE);
+veC = AutoCrop(veC);
+veT = AutoCrop(veT);
+
+vpE = AutoCrop(vpE);
+vpC = AutoCrop(vpC);
+vpT = AutoCrop(vpT);
+vpR = zeros(size(vpE)); % RRM doesn't have vp map
+
+%% END OF FILE - ADDITIONAL CODE FOR FIGURES BELOW
+% Comment/delete the 'return' to see the figures
+% or execute the cells manually
+return
+
+%% Plot Cp and Crr
+
+figure
+subplot(2,1,1)
+plot(t,Cp,'r','LineWidth',2)
+xlabel('Time [min]')
+ylabel('Concentration [mM]')
+title('Blood plasma')
+
+subplot(2,1,2)
+plot(t,Crr,'g','LineWidth',2)
+xlabel('Time [min]')
+ylabel('Concentration [mM]')
+title('Reference Region')
+
+%% Produce scatter plots of estimates
+
+% Depending on user's screen, these figures might appear squished.
+% Resize manually to unsquish them.
 
 % Size of the scatter plots
 sz = 5;
@@ -130,18 +220,14 @@ curM2a = pkR(:,1)<mY & pkR(:,1) > 0;
 curM2b = pkE(:,1)<mY & pkE(:,1) > 0;
 curM2c = pkCE(:,1)<mY & pkCE(:,1) > 0;
 
-% Calculate slow using linear least squares
+% Calculate slope using linear least squares
 m1=pkT(curM1&curM2a,1)\pkR(curM1&curM2a,1);
 m2=pkT(curM1&curM2b,1)\pkE(curM1&curM2b,1);
 m3=pkT(curM1&curM2c,1)\pkCE(curM1&curM2c,1);
 
-% Calculate Pearson correlation coefficient
-[c1,p1] = getCorrCoef(pkT(curM1&curM2a,1),pkR(curM1&curM2a,1));
-[c2,p2] = getCorrCoef(pkT(curM1&curM2b,1),pkE(curM1&curM2b,1));
-[c3,p3] = getCorrCoef(pkT(curM1&curM2c,1),pkCE(curM1&curM2c,1));
-
 % Plot figure
 figure
+subplot(1,3,1)
 scatter(pkT(curM1&curM2a,1),pkR(curM1&curM2a,1),sz,listColours{1})
 hold on; plot(x,x*m1);
 ylim([0 mY])
@@ -150,7 +236,7 @@ title('Scatter - Ktrans - RRM vs ETM')
 xlabel('Ktrans - ETM')
 ylabel('Ktrans - RRM')
 
-figure
+subplot(1,3,2)
 scatter(pkT(curM1&curM2b,1),pkE(curM1&curM2b,1),sz,listColours{2})
 hold on; plot(x,x*m2);
 ylim([0 mY])
@@ -159,7 +245,7 @@ title('Scatter - Ktrans - ERRM vs ETM')
 xlabel('Ktrans - ETM')
 ylabel('Ktrans - ERRM')
 
-figure
+subplot(1,3,3)
 scatter(pkT(curM1&curM2c,1),pkCE(curM1&curM2c,1),sz,listColours{3})
 hold on; plot(x,x*m3);
 ylim([0 mY])
@@ -167,14 +253,6 @@ xlim([0 mX])
 title('Scatter - Ktrans - CERRM vs ETM')
 xlabel('Ktrans - ETM')
 ylabel('Ktrans - CERRM')
-
-slopesKt = [m1 m2 m3]
-corrKt = [c1 c2 c3]
-pOfCorrKt = [p1 p2 p3]
-
-% [polyfit(pkT(curM1&curM2a,1),pkR(curM1&curM2a,1),1)...
-%     polyfit(pkT(curM1&curM2a,1),pkE(curM1&curM2a,1),1)...
-%     polyfit(pkT(curM1&curM2a,1),pkCE(curM1&curM2a,1),1)]
 
 % %%% kep
 % Same steps as for Ktrans
@@ -191,11 +269,8 @@ m1=pkT(curM1&curM2a,2)\pkR(curM1&curM2a,3);
 m2=pkT(curM1&curM2b,2)\pkE(curM1&curM2b,3);
 m3=pkT(curM1&curM2c,2)\pkCE(curM1&curM2c,3);
 
-[c1,p1] = getCorrCoef(pkT(curM1&curM2a,2),pkR(curM1&curM2a,3));
-[c2,p2] = getCorrCoef(pkT(curM1&curM2b,2),pkE(curM1&curM2b,3));
-[c3,p3] = getCorrCoef(pkT(curM1&curM2c,2),pkCE(curM1&curM2c,3));
-
 figure
+subplot(1,3,1)
 scatter(pkT(curM1&curM2a,2),pkR(curM1&curM2a,3),sz,listColours{1})
 hold on; plot(x,x*m1);
 ylim([0 mY])
@@ -204,7 +279,7 @@ title('Scatter - kep - RRM vs ETM')
 xlabel('kep - ETM')
 ylabel('kep - RRM')
 
-figure
+subplot(1,3,2)
 scatter(pkT(curM1&curM2b,2),pkE(curM1&curM2b,3),sz,listColours{2})
 hold on; plot(x,x*m2);
 ylim([0 mY])
@@ -213,7 +288,7 @@ title('Scatter - kep - ERRM vs ETM')
 xlabel('kep - ETM')
 ylabel('kep - ERRM')
 
-figure
+subplot(1,3,3)
 scatter(pkT(curM1&curM2c,2),pkCE(curM1&curM2c,3),sz,listColours{3})
 hold on; plot(x,x*m3);
 ylim([0 mY])
@@ -222,18 +297,13 @@ title('Scatter - kep - CERRM vs ETM')
 xlabel('kep - ETM')
 ylabel('kep - CERRM')
 
-slopesKep = [m1 m2 m3]
-corrKep = [c1 c2 c3]
-pOfCorrKep = [p1 p2 p3]
-
-% [polyfit(pkT(curM1&curM2a,2),pkR(curM1&curM2a,3),1)...
-%     polyfit(pkT(curM1&curM2a,2),pkE(curM1&curM2a,3),1)...
-%     polyfit(pkT(curM1&curM2a,2),pkCE(curM1&curM2a,3),1)]
-
 % %%% ve
 mX = 0.5;
 mY = 10;
 x = 0:mX:mX;
+
+% Calculate ve from Extended Tofts model (Ktrans/kep)
+estVeT = pkT(:,1)./pkT(:,2);
 
 curM1 = estVeT<mX & estVeT > 0;
 curM2a = pkR(:,2)<mY & pkR(:,2) > 0;
@@ -244,11 +314,8 @@ m1=estVeT(curM1&curM2a)\pkR(curM1&curM2a,2);
 m2=estVeT(curM1&curM2b)\pkE(curM1&curM2b,2);
 m3=estVeT(curM1&curM2c)\pkCE(curM1&curM2c,2);
 
-[c1,p1] = getCorrCoef(estVeT(curM1&curM2a),pkR(curM1&curM2a,2));
-[c2,p2] = getCorrCoef(estVeT(curM1&curM2b),pkE(curM1&curM2b,2));
-[c3,p3] = getCorrCoef(estVeT(curM1&curM2c),pkCE(curM1&curM2c,2));
-
 figure
+subplot(1,3,1)
 scatter(estVeT(curM1&curM2a),pkR(curM1&curM2a,2),sz,listColours{1})
 hold on; plot(x,x*m1);
 ylim([0 mY])
@@ -257,7 +324,7 @@ title('Scatter - ve - RRM vs ETM')
 xlabel('ve - ETM')
 ylabel('ve - RRM')
 
-figure
+subplot(1,3,2)
 scatter(estVeT(curM1&curM2b),pkE(curM1&curM2b,2),sz,listColours{2})
 hold on; plot(x,x*m2);
 ylim([0 mY])
@@ -266,7 +333,7 @@ title('Scatter - ve - ERRM vs ETM')
 xlabel('ve - ETM')
 ylabel('ve - ERRM')
 
-figure
+subplot(1,3,3)
 scatter(estVeT(curM1&curM2c),pkCE(curM1&curM2c,2),sz,listColours{3})
 hold on; plot(x,x*m3);
 ylim([0 mY])
@@ -275,15 +342,7 @@ title('Scatter - ve - CERRM vs ETM')
 xlabel('ve - ETM')
 ylabel('ve - CERRM')
 
-slopesVe = [m1 m2 m3]
-corrVe = [c1 c2 c3]
-pOfCorrVe = [p1 p2 p3]
-
-% [polyfit(estVeT(curM1&curM2a),pkR(curM1&curM2a,2),1)...
-%     polyfit(estVeT(curM1&curM2a),pkE(curM1&curM2a,2),1)...
-%     polyfit(estVeT(curM1&curM2a),pkCE(curM1&curM2a,2),1)]
-
-%% %%% vp
+% %%% vp
 mX = 0.1;
 mY = 2;
 x = 0:mX:mX;
@@ -295,10 +354,8 @@ curM2c = pkCE(:,4)<mY & pkCE(:,4) > 0;
 m2=pkT(curM1&curM2b,3)\pkE(curM1&curM2b,4);
 m3=pkT(curM1&curM2c,3)\pkCE(curM1&curM2c,4);
 
-[c2,p2] = getCorrCoef(pkT(curM1&curM2b,3),pkE(curM1&curM2b,4));
-[c3,p3] = getCorrCoef(pkT(curM1&curM2c,3),pkCE(curM1&curM2c,4));
-
 figure
+subplot(1,2,1)
 scatter(pkT(curM1&curM2b,3),pkE(curM1&curM2b,4),sz,listColours{2})
 hold on; plot(x,x*m2);
 ylim([0 2])
@@ -307,7 +364,7 @@ title('Scatter - vp - ERRM vs ETM')
 xlabel('vp - ETM')
 ylabel('vp - ERRM')
 
-figure
+subplot(1,2,2)
 scatter(pkT(curM1&curM2c,3),pkCE(curM1&curM2c,4),sz,listColours{3})
 hold on; plot(x,x*m3);
 ylim([0 2])
@@ -316,244 +373,71 @@ title('Scatter - vp - CERRM vs ETM')
 xlabel('vp - ETM')
 ylabel('vp - CERRM')
 
-slopesVp = [m2 m3]
-corrVp = [c2 c3]
-pOfCorrVp = [p2 p3]
-%%
-mySlices = 7:9;
+%% Produce in-vivo maps of kep
 
-%% kep
-kepR = AutoCrop(kepR);
-kepE = AutoCrop(kepE);
-kepC = AutoCrop(kepC);
-kepT = AutoCrop(kepT);
+% These settings are optimized for the first patient
+% They'll likely have to be changed for the other two
 
-climR = [0 1];
-climT = [0 1];
+% Pick which slices to show
+mySlices = 7:9; % Manuscript shows slices 7 to 9 of patient 1 (or A)
+% Set the range of the colorbar - Manuscript uses range of 0 to 1 for kep
+climR = [0 1]; % % For RRM, ERRM and CERRM
+climT = [0 1]; % For ExtToftsModel
+% Pick which colormap to use - manuscript uses 'jet '
+cMap = 'jet'; % 
 
-figure
-subplot(4,3,1)
-imagesc(kepR(:,:,mySlices(1)),climR);
-axis square
-ylabel('RRM')
-subplot(4,3,2)
-imagesc(kepR(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,3)
-imagesc(kepR(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,4)
-imagesc(kepE(:,:,mySlices(1)),climR);
-axis square
-ylabel('ERRM')
-subplot(4,3,5)
-imagesc(kepE(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,6)
-imagesc(kepE(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,7)
-imagesc(kepC(:,:,mySlices(1)),climR);
-axis square
-ylabel('CERRM')
-subplot(4,3,8)
-imagesc(kepC(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,9)
-imagesc(kepC(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,10)
-imagesc(kepT(:,:,mySlices(1)),climT);
-axis square
-ylabel('ETM')
-subplot(4,3,11)
-imagesc(kepT(:,:,mySlices(2)),climT);
-axis square
-subplot(4,3,12)
-imagesc(kepT(:,:,mySlices(3)),climT);
-axis square
+% This function should take care of the rest
+makeGridMaps({kepR,kepE,kepC,kepT},mySlices,{'RRM','ERRM','CERRM','ETM'},...
+    {climR,climR,climR,climT},cMap)
 
 % Plots title - might not work for some users if they're missing toolboxes
 suptitle('k_{ep}')
-%% KTrans
-ktR = AutoCrop(ktR);
-ktE = AutoCrop(ktE);
-ktC = AutoCrop(ktC);
-ktT = AutoCrop(ktT);
 
+%% Produce in-vivo maps of Ktrans
+% Refer to previous cell (for kep) for comments
+
+mySlices = 7:9;
 climR = [0 3];
-climT = [0 .1];
+climT = [0 0.1];
+cMap = 'jet'; 
 
-figure
-subplot(4,3,1)
-imagesc(ktR(:,:,mySlices(1)),climR);
-axis square
-ylabel('RRM')
-subplot(4,3,2)
-imagesc(ktR(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,3)
-imagesc(ktR(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,4)
-imagesc(ktE(:,:,mySlices(1)),climR);
-axis square
-ylabel('ERRM')
-subplot(4,3,5)
-imagesc(ktE(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,6)
-imagesc(ktE(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,7)
-imagesc(ktC(:,:,mySlices(1)),climR);
-axis square
-ylabel('CERRM')
-subplot(4,3,8)
-imagesc(ktC(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,9)
-imagesc(ktC(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,10)
-imagesc(ktT(:,:,mySlices(1)),climT);
-axis square
-ylabel('ETM')
-subplot(4,3,11)
-imagesc(ktT(:,:,mySlices(2)),climT);
-axis square
-subplot(4,3,12)
-imagesc(ktT(:,:,mySlices(3)),climT);
-axis square
-
+makeGridMaps({ktR,ktE,ktC,ktT},mySlices,{'RRM','ERRM','CERRM','ETM'},...
+    {climR,climR,climR,climT},cMap)
 suptitle('K^{trans}')
-%% ve
-veR = AutoCrop(veR);
-veE = AutoCrop(veE);
-veC = AutoCrop(veC);
-veT = AutoCrop(veT);
 
+%% Produce in-vivo maps of ve
+% Refer to previous cell (for kep) for comments
+
+mySlices = 7:9;
 climR = [0 5];
 climT = [0 0.35];
 
-figure
-subplot(4,3,1)
-imagesc(veR(:,:,mySlices(1)),climR);
-axis square
-ylabel('RRM')
-subplot(4,3,2)
-imagesc(veR(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,3)
-imagesc(veR(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,4)
-imagesc(veE(:,:,mySlices(1)),climR);
-axis square
-ylabel('ERRM')
-subplot(4,3,5)
-imagesc(veE(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,6)
-imagesc(veE(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,7)
-imagesc(veC(:,:,mySlices(1)),climR);
-axis square
-ylabel('CERRM')
-subplot(4,3,8)
-imagesc(veC(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,9)
-imagesc(veC(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,10)
-imagesc(veT(:,:,mySlices(1)),climT);
-axis square
-ylabel('ETM')
-subplot(4,3,11)
-imagesc(veT(:,:,mySlices(2)),climT);
-axis square
-subplot(4,3,12)
-imagesc(veT(:,:,mySlices(3)),climT);
-axis square
-
+makeGridMaps({veR,veE,veC,veT},mySlices,{'RRM','ERRM','CERRM','ETM'},...
+    {climR,climR,climR,climT},cMap)
 suptitle('v_e')
-%% vp
-vpE = AutoCrop(vpE);
-vpC = AutoCrop(vpC);
-vpT = AutoCrop(vpT);
-vpR = zeros(size(vpE));
 
+%% Produce in-vivo maps of vp
+% Refer to previous cell (for kep) for comments
+
+mySlices = 7:9;
 climR = [0 1];
 climT = [0 0.05];
 
-figure
-subplot(4,3,1)
-imagesc(vpR(:,:,mySlices(1)),climR);
-axis square
-ylabel('RRM')
-subplot(4,3,2)
-imagesc(vpR(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,3)
-imagesc(vpR(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,4)
-imagesc(vpE(:,:,mySlices(1)),climR);
-axis square
-ylabel('ERRM')
-subplot(4,3,5)
-imagesc(vpE(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,6)
-imagesc(vpE(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,7)
-imagesc(vpC(:,:,mySlices(1)),climR);
-axis square
-ylabel('CERRM')
-subplot(4,3,8)
-imagesc(vpC(:,:,mySlices(2)),climR);
-axis square
-subplot(4,3,9)
-imagesc(vpC(:,:,mySlices(3)),climR);
-axis square
-
-subplot(4,3,10)
-imagesc(vpT(:,:,mySlices(1)),climT);
-axis square
-ylabel('ETM')
-subplot(4,3,11)
-imagesc(vpT(:,:,mySlices(2)),climT);
-axis square
-subplot(4,3,12)
-imagesc(vpT(:,:,mySlices(3)),climT);
-axis square
-
+makeGridMaps({vpR,vpE,vpC,vpT},mySlices,{'RRM','ERRM','CERRM','ETM'},...
+    {climR,climR,climR,climT},cMap)
 suptitle('v_p')
-%% Plot Cp and Crr
 
-figure('Position',[300 300 500 600])
-subplot(2,1,1)
-plot(t,Cp,'r','LineWidth',2)
-xlabel('Time [min]')
-ylabel('Concentration [mM]')
-title('Blood plasma')
+%% Histogram of kepRR estimates
+% This wasn't show in the manuscript
 
-subplot(2,1,2)
-plot(t,Crr,'g','LineWidth',2)
-xlabel('Time [min]')
-ylabel('Concentration [mM]')
-title('Reference Region')
+% Define the max/min of the x-axis for the histogram
+binLim = 3;
+
+% The rest should work on its own
+% Histogram should show negative estimates as a different colour.
+x=pkE(corrMask,5);
+
+figure
+histogram(x,70,'BinLimits',[-binLim binLim])
+hold on
+histogram(x,35,'BinLimits',[-binLim 0])

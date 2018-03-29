@@ -1,8 +1,9 @@
 % Quick simulation - shows the fits on noisy data
 % Simulates curves for tissue of interest and reference region with noise
-% then shows the fits
+% then shows the fits by the ERRM.
+% This figure was adapted into Supplementary Figure S1 in the manuscript.
 
-% Estimated runtime: <10 seconds
+% Estimated runtime: < 1 second
 
 %% Pre-setup
 clearvars
@@ -32,7 +33,7 @@ tRes = 1; % Desired temporal resolution (in seconds), obtained by downsampling s
 t=sSize:sSize:600; % Time, in seconds
 t=t'/60; % Convert time into minutes
 
-% Generate the arterial input function using literature-based model, injection at 60s
+% Generate the arterial input function using literature-based model, bolus arrival at 60s
 Cp = ParkerAif(t,t(60/sSize));
 
 %% Simulate concentration in Tissue of Interest
@@ -61,13 +62,15 @@ Cp = downsample(Cp,dFactor);
 
 %% Fit models to simulated data
 
-[pkRRM fittedRRM] = LRRM(Ct,Crr,t); % RRM
-[pkERRM fittedERRM] = ERRM(Ct,Crr,t); % ERRM
-[pkERRMn fittedERRMn] = ERRM(Ct,Crr,t,true); % ERRM - using lsqnonneg
-[pkCERRM fittedCERRM] = CERRM(Ct,Crr,t); % CERRM
-[pkRTM estCpRTM] = doRTM(Ct,Crr,t,[ktRR veRR],0);
-[pkERTM estCpERTM] = doRTM(Ct,Crr,t,[ktRR veRR],1);
+[pkRRM, fittedRRM] = LRRM(Ct,Crr,t); % RRM
+[pkERRM, fittedERRM] = ERRM(Ct,Crr,t); % ERRM
+[pkERRMn, fittedERRMn] = ERRM(Ct,Crr,t,true); % ERRM - using lsqnonneg
+[pkCERRM, fittedCERRM] = CERRM(Ct,Crr,t); % CERRM
 
+% Doing the Reference Tissue Method
+% Results are not shown
+[pkRTM, estCpRTM] = doRTM(Ct,Crr,t,[ktRR veRR],0);
+[pkERTM, estCpERTM] = doRTM(Ct,Crr,t,[ktRR veRR],1);
 fittedRTM = ToftsKety(estCpRTM,pkRTM,t,0);
 fittedERTM = ToftsKety(estCpERTM,pkERTM,t,1);
 
@@ -83,8 +86,11 @@ listColours{1} = [181,238,252]./255; % Crr
 % Show the early part where most of interesting things happen
 opt_xlim = [0.5 4.0];
 
+% Figure might be too wide for users with smaller screen?
+figure('Position',[300 300 1200 700])
+
 % Plot Cp
-figure;
+subplot(2,3,1)
 plot(t,Cp,'r', 'LineWidth',2)
 xlabel('Time [min]')
 ylabel('Concentration [mM]')
@@ -93,7 +99,7 @@ legend('C_p(t) - Blood Plasma')
 xlim(opt_xlim)
 
 % Plot noiseless curves
-figure
+subplot(2,3,2)
 iterPlot(noiselessT,[noiselessCt noiselessCrr],listColours)
 xlabel('Time [min]')
 ylabel('Concentration [mM]')
@@ -103,7 +109,7 @@ xlim(opt_xlim)
 ylim([-0.01 1.4])
 
 % Plot noisy curves
-figure
+subplot(2,3,3)
 iterPlot(t,[Ct Crr],listColours)
 xlabel('Time [min]')
 ylabel('Concentration [mM]')
@@ -113,7 +119,7 @@ xlim(opt_xlim)
 ylim([-0.01 1.4])
 
 % Plot ERRM fits on noisy data
-figure
+subplot(2,3,4)
 iterPlot(t,fittedERRM,listColours)
 iterScatter(t,cumtrapz(t,Ct),5,listColours)
 xlabel('Time [min]')
@@ -123,7 +129,7 @@ xlim(opt_xlim)
 ylim([-0.01 1.8])
 
 % Plot ERRM fits on noisy data - zoomed in
-figure
+subplot(2,3,5)
 iterPlot(t,fittedERRM,listColours)
 iterScatter(t,cumtrapz(t,Ct),40,listColours)
 xlabel('Time [min]')
@@ -132,6 +138,13 @@ title('ERRM fit on noisy curves - zoomed in')
 xlim([1 1.5])
 ylim([-0.01 0.3])
 
+% Plot residuals of ERRM fit
+subplot(2,3,6)
+iterPlot(t,cumtrapz(t,Ct)-fittedERRM,listColours)
+xlabel('Time [min]')
+ylabel('Residuals [mM*min]')
+title('Residuals of ERRM fit on noisy curves')
+xlim(opt_xlim)
 %%
 toc
 disp('Finished quick simulation showing ERRM fit on noisy data')

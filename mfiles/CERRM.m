@@ -60,6 +60,7 @@ function [pkParams, fittedCt, kepRR, pkERRM, fittedCtERRM] = CERRM(Ct, Crr, t, k
     else
         pkERRM = NaN;
         fittedCtERRM = NaN;
+        rawKepRR = NaN;
     end
     
     %%
@@ -110,6 +111,6 @@ function [pkParams, fittedCt, kepRR, pkERRM, fittedCtERRM] = CERRM(Ct, Crr, t, k
         veRel = ktRel .* kepRR ./ kep;
         pkParams = [ktRel, veRel, kep, vpKtRR];
     end
-    pkParams(:,5) = kepRR;
+    pkParams(:,5) = rawKepRR;
     
 end
