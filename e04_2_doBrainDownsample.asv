@@ -44,7 +44,6 @@ tempPkET2=LLSQ(Ct2,Cp2,t2,1);
 tempPkET3=LLSQ(Ct3,Cp3,t3,1);
 
 % 'true' parameters are fits at original temporal resolution
-%%
 trueKtCE = [tempPkCE1(:,1); tempPkCE2(:,1); tempPkCE3(:,1)];
 trueVeCE = [tempPkCE1(:,2); tempPkCE2(:,2); tempPkCE3(:,2)];
 trueKepCE = [tempPkCE1(:,3); tempPkCE2(:,3); tempPkCE3(:,3)];
@@ -56,6 +55,13 @@ trueVeET = trueKtET ./ trueKepET;
 trueVpET = [tempPkET1(:,3); tempPkET2(:,3); tempPkET3(:,3)];
 
 TRes(1) = 60*(t(2)-t(1));
+
+% Save the fitted parameters (for first patient - Figure 6)
+rawFitsET = zeros([size(tempPkET1) 12]);
+rawFitsCE = zeros([size(tempPkCE1) 12]);
+
+rawFitsET(:,:,1) = tempPkET1;
+rawFitsCE(:,:,1) = tempPkCE1;
 
 %% Downsample the data and refit
 nVox1 = size(Ct1,2);
@@ -140,6 +146,9 @@ for i=2:12
         tempPkCE3(j,:)=CERRM(curCt,curCrr,curT,estKepRR3(i));
     end
     
+    rawFitsET(:,:,i) = tempPkET1;
+    rawFitsCE(:,:,i) = tempPkCE1;
+    
     % Calculate percent change
     tempErrKtCE=PercentError([tempPkCE1(:,1); tempPkCE2(:,1); tempPkCE3(:,1)],trueKtCE);
     tempErrVeCE=PercentError([tempPkCE1(:,2); tempPkCE2(:,2); tempPkCE3(:,2)],trueVeCE);
@@ -214,14 +223,157 @@ ylim([-100 300])
 xlabel('Temporal Resolution [s]')
 ylabel('Percent Error')
 title('vp')
-%%
-return
+%% Plot downsampled maps (Fig 6) - Preparation
+
+load('./data/gbm/TCGA-06-0185-1.mat');
+mask = mask>0;
+mask(mask) = max(Ct)'>0.05 & max(Ct)'<1;
+
+[mapKtET, mapKepET, mapVeET, mapVpET, ...
+    mapKtCE, mapKepCE, mapVeCE, mapVpCE] = deal(zeros([length(mask(:)) 12]));
+
+for i=1:12
+   mapKtET(mask(:),i) = rawFitsET(:,1,i); 
+   mapVeET(mask(:),i) = rawFitsET(:,1,i)./rawFitsET(:,2,i);
+   mapKepET(mask(:),i) = rawFitsET(:,2,i); 
+   mapVpET(mask(:),i) = rawFitsET(:,3,i); 
+   
+   mapKtCE(mask(:),i) = rawFitsCE(:,1,i); 
+   mapVeCE(mask(:),i) = rawFitsCE(:,2,i); 
+   mapKepCE(mask(:),i) = rawFitsCE(:,3,i); 
+   mapVpCE(mask(:),i) = rawFitsCE(:,4,i); 
+end
+
+mapKtET = reshape(mapKtET,[size(mask) 12]);
+mapVeET = reshape(mapVeET,[size(mask) 12]);
+mapKepET = reshape(mapKepET,[size(mask) 12]);
+mapVpET = reshape(mapVpET,[size(mask) 12]);
+
+mapKtCE = reshape(mapKtCE,[size(mask) 12]);
+mapVeCE = reshape(mapVeCE,[size(mask) 12]);
+mapKepCE = reshape(mapKepCE,[size(mask) 12]);
+mapVpCE = reshape(mapVpCE,[size(mask) 12]);
+%% Plot downsampled maps
+
+% Pick which slice to plot
+chosenSlice = 7; % Manuscript uses slice 7
+
+% The temporal resolutions will be TRes(tresList)
+tresList = [1,6,12];
+% Code is designed to work for [1,6,12] - changing it will cause issues
+% Specifically, the subplots will not show correctly.
+
+for i=tresList
+    curMapKtET = AutoCrop(mapKtET(:,:,:,i));
+    curMapVeET = AutoCrop(mapVeET(:,:,:,i));
+    curMapKepET = AutoCrop(mapKepET(:,:,:,i));
+    curMapVpET = AutoCrop(mapVpET(:,:,:,i));
+
+    curMapKtCE = AutoCrop(mapKtCE(:,:,:,i));
+    curMapVeCE = AutoCrop(mapVeCE(:,:,:,i));
+    curMapKepCE = AutoCrop(mapKepCE(:,:,:,i));
+    curMapVpCE = AutoCrop(mapVpCE(:,:,:,i));
+    
+    figure(1)
+    subplot(2,3,round(i/6)+1)
+    imagesc(curMapKtET(:,:,chosenSlice))
+    caxis([0 0.1]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('ETM-Ktrans')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+    subplot(2,3,round(i/6)+4)
+    imagesc(curMapKtCE(:,:,chosenSlice))
+    caxis([0 3]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('CERRM-Ktrans')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+    
+    figure(2)
+    subplot(2,3,round(i/6)+1)
+    imagesc(curMapKepET(:,:,chosenSlice))
+    caxis([0 1]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('ETM-kep')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+    subplot(2,3,round(i/6)+4)
+    imagesc(curMapKepCE(:,:,chosenSlice))
+    caxis([0 1]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('CERRM-kep')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+    
+    figure(3)
+    subplot(2,3,round(i/6)+1)
+    imagesc(curMapVeET(:,:,chosenSlice))
+    caxis([0 0.35]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('ETM-ve')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+    subplot(2,3,round(i/6)+4)
+    imagesc(curMapVeCE(:,:,chosenSlice))
+    caxis([0 5]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('CERRM-ve')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+    
+    figure(4)
+    subplot(2,3,round(i/6)+1)
+    imagesc(curMapVpET(:,:,chosenSlice))
+    caxis([0 0.05]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('ETM-vp')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+    subplot(2,3,round(i/6)+4)
+    imagesc(curMapVpCE(:,:,chosenSlice))
+    caxis([0 1]); colormap('jet')
+    axis image; set(gca,'xtick',[]); set(gca,'ytick',[])
+    if i==1
+        ylabel('CERRM-vp')
+    end
+    xlabel([num2str(TRes(i)) ' s'])
+end
+
+%% Plot all the input functions and reference region curves (SuppFigS4)
+
+figure;
+
+subplot(1,2,1)
+plot(t,[Cp1 Cp2 Cp3], 'linewidth', 3)
+ylim([0 16])
+xlabel('Time [min]')
+ylabel('Concentration [mM]')
+
+subplot(1,2,2)
+plot(t,[Crr1 Crr2 Crr3], 'linewidth', 3)
+ylim([0 0.3])
+xlabel('Time [min]')
+ylabel('Concentration [mM]')
+
 %% Export results to CSV
 % This exports the median error (err), and 25th and 75th quantiles (qt25, qt75)
 % to a CSV file.
 
 % I don't think this ended up being used. But it's here incase someone
 % finds it useful.
+
+% Headers are:
+% - errKt, errVe, etc - Median percent change
+% - qt25Kt, qt25Ve, etc - 25th percentile (1st quartile) of percent change
+% - qt75Kt, qt75Ve, etc - 75th percentile (3rd quartile) of percent change
 
 outFile = fullfile('./dataResults',['e04-downsampleGbmResults.csv']);
 hdr=['FitMethod,TemporalRes,errKt,errVe,errKep,errVp,qt25Kt,qt75Kt,qt25Ve,qt75Ve,qt25Kep,qt75Kep,qt25Vp,qt75Vp'];
@@ -231,11 +383,6 @@ for i=1:12
    outLine = {'ETM',TRes(i),qKtET(i,2),qVeET(i,2),qKepET(i,2),qVpET(i,2),...
        qKtET(i,1),qKtET(i,3),qVeET(i,1),qVeET(i,3),qKepET(i,1),qKepET(i,3),...
        qVpET(i,1),qVpET(i,3)};
-   fprintf(outID,'%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n', outLine{:});
-   
-   outLine = {'RRM',TRes(i),qKtRR(i,2),qVeRR(i,2),qKepRR(i,2),NaN,...
-       qKtRR(i,1),qKtRR(i,3),qVeRR(i,1),qVeRR(i,3),qKepRR(i,1),qKepRR(i,3),...
-       NaN,NaN};
    fprintf(outID,'%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n', outLine{:});
    
    outLine = {'CERRM',TRes(i),qKtCE(i,2),qVeCE(i,2),qKepCE(i,2),qVpCE(i,2),...
