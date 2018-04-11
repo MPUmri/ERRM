@@ -2,9 +2,7 @@
 
 % Note, there is additional code at the end for producing figures.
 % They are not produced by default because it leads to a flood of figures.
-% They can be produced manually (select cell and ctrl+enter on windows)
-% If you do want a flood of figures, then simply delete the 'return' line
-% (This will produce ~10 figures per run)
+% Change setting in the next cell to show these figures.
 
 % Estimated runtime: ~5 seconds
 
@@ -14,7 +12,12 @@ addpath('./mfiles')
 
 % Select which dataset to process
 i=1; % Options: 1, 2, 3 (called A, B, C, in manuscripts)
-%%
+% Figure 4 in manuscript uses i=1
+
+% Decide if you want a flood of figures
+openFloodgates = 0; % Options: 0 (false) or 1 (true)
+
+%% Load data
 matList = {'TCGA-06-0185-1.mat','TCGA-06-0185-2.mat','TCGA-06-0881-1.mat'};
 load(fullfile('./data/gbm',matList{i}));
 % The loaded data contains:
@@ -36,14 +39,18 @@ stdDev_perContrastRR = std(Crr(1:6));
 %% Fit with ERRM and CERRM
 
 % CERRM() provides paramaters for both ERRM (pkE) and CERRM (pkCE)
+disp('Fitting ERRM and CERRM')
+tic
 [pkCE, ~, estKepRR_CE, pkE]=CERRM(Ct,Crr,t);
-
+toc
 %% Fit with non-extended RRM
+disp('Fitting Non-extended RRM')
 tic
 pkR=LRRM(Ct,Crr,t);
 toc
 
 %% Fit with ExtToftsModel
+disp('Fitting Extended Tofts Model')
 tic
 [pkT residT fitETM] = LLSQ(Ct,Cp,t,1);
 toc
@@ -61,6 +68,9 @@ vpRR = pkCrr(3);
 
 %% Correlations
 
+fprintf('\n')
+disp('CORRELATIONS:');
+
 % Only use voxels where max concentration is between 0.05 and 1 mM
 corrMask = max(Ct)'>0.05 & max(Ct)'<1;
 
@@ -68,14 +78,14 @@ corrMask = max(Ct)'>0.05 & max(Ct)'<1;
 cKtR=getCorrCoef(pkT(corrMask,1),pkR(corrMask,1));
 cKtE=getCorrCoef(pkT(corrMask,1),pkE(corrMask,1));
 cKtCE=getCorrCoef(pkT(corrMask,1),pkCE(corrMask,1));
-disp('Correlation with Ktrans')
+disp('Correlation with Ktrans [RRM ERRM CERRM]')
 disp([cKtR cKtE cKtCE])
 
 % kep correlation coefficients
 cKepR=getCorrCoef(pkT(corrMask,2),pkR(corrMask,3));
 cKepE=getCorrCoef(pkT(corrMask,2),pkE(corrMask,3));
 cKepCE=getCorrCoef(pkT(corrMask,2),pkCE(corrMask,3));
-disp('Correlation with kep')
+disp('Correlation with kep [RRM ERRM CERRM]')
 disp([cKepR cKepE cKepCE])
 
 % ve correlation coefficients - requires extra bit of filtering
@@ -98,13 +108,13 @@ cVeR=getCorrCoef(estVe(veMask),pkR(veMask,2));
 cVeE=getCorrCoef(estVe(veMask),pkE(veMask,2));
 cVeCE=getCorrCoef(estVe(veMask),pkCE(veMask,2));
 
-disp('Correlation with ve')
+disp('Correlation with ve [RRM ERRM CERRM]')
 disp([cVeR cVeE cVeCE])
 
 % vp correlation coefficients
 cVpE=getCorrCoef(pkT(corrMask,3),pkE(corrMask,4));
 cVpCE=getCorrCoef(pkT(corrMask,3),pkCE(corrMask,4));
-disp('Correlation with vp')
+disp('Correlation with vp [RRM ERRM CERRM]')
 disp([NaN cVpE cVpCE])
 
 %% Make the maps
@@ -175,10 +185,11 @@ vpC = AutoCrop(vpC);
 vpT = AutoCrop(vpT);
 vpR = zeros(size(vpE)); % RRM doesn't have vp map
 
-%% END OF FILE - ADDITIONAL CODE FOR FIGURES BELOW
-% Comment/delete the 'return' to see the figures
-% or execute the cells manually
-return
+%% POTENTIAL END OF FILE
+% Continue and show figures if that's what user wants
+if ~openFloodgates
+    return
+end
 
 %% Plot Cp and Crr
 
@@ -441,3 +452,6 @@ figure
 histogram(x,70,'BinLimits',[-binLim binLim])
 hold on
 histogram(x,35,'BinLimits',[-binLim 0])
+title('Distribution of kepRR estimates from ERRM')
+xlabel('kepRR estimate from ERRM [min^{-1}]')
+ylabel('Counts')
