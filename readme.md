@@ -17,7 +17,7 @@ The code, results, and interactive figure (if available) for each figure is list
 **Figure 1, 2, 3**
 - Code: `e03_1_makeSimMap.m`, `e03_2_analyzeSimMap.m`, `e03_3_collectSimMap.m`
 - Results: `./dataResults/e03a...` and `./dataResults/e03b...`
-- Interactive figures: [Fig1](https://rawgit.com/notZaki/ERRM-xtra/master/interactiveFigures/fig-errMap.html) [Fig2](https://rawgit.com/notZaki/ERRM-xtra/master/interactiveFigures/fig-errSim.html) [Fig3](https://rawgit.com/notZaki/ERRM-xtra/master/interactiveFigures/fig-errTRes.html)
+- Interactive figures: [Fig1](https://htmlpreview.github.io/?https://raw.githubusercontent.com/notZaki/ERRM-xtra/master/interactiveFigures/fig-errMap.html) [Fig2](https://htmlpreview.github.io/?https://raw.githubusercontent.com/notZaki/ERRM-xtra/master/interactiveFigures/fig-errSim.html) [Fig3](https://htmlpreview.github.io/?https://raw.githubusercontent.com/notZaki/ERRM-xtra/master/interactiveFigures/fig-errTRes.html)
 
 **Figure 4, 5** & **Table 1**
 - Code: `e04_1_doBrainSingle.m` 
