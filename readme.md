@@ -45,7 +45,7 @@ The manuscript discusses the following models:
 - Extended Reference Region Model (ERRM)
 - Constrained Extended Reference Region Model (CERRM)
 
-The code and the interactive includes three additional models/methods:
+The code and the interactive figures include three additional models/methods:
 - Constrained Reference Region Model (CRRM) - [Ref](https://onlinelibrary.wiley.com/doi/abs/10.1002/mrm.26530)
 - Reference Tissue Method (RTM) - briefly described in manuscript
 - Extended Reference Tissue Method (ERTM)
